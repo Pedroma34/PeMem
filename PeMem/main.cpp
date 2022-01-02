@@ -1,6 +1,4 @@
-#include "Process.h"
-#include "Address.h"
-#include "Time.h"
+#include "PeMem.h"
 
 /*Simple, automated, and unfinished program that aims to read and write to addresses in a facile way.
 It contains the Process class, which will be constantly looking for the target process.
@@ -8,8 +6,9 @@ It contains the Address class, which reads from a file that containes names, use
 "keys", and addresses of interest. That file can and should be edited and updated with addresses.*/
 
 int main() {
-	/*Process, float value is optional. By default, it is set to 0.100f (0.1 seconds)*/
-	pemem::Process process(L"bio4.exe", L"bio4.exe", 0.50f); //Process name, module name, seconds
+	/*Process. Float value is optional. By default, it is set to 0.100f (0.1 seconds)*/
+	pemem::Process process("Resident Evil 4", 
+		L"bio4.exe", L"bio4.exe", 0.50f); 
 	if (!process.isOpen()) {
 		auto processname = process.GetProcessName();
 		MessageBoxA(NULL, "Process NOT OPEN", "ERROR!", MB_ICONERROR | MB_OK);//error box
