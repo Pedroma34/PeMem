@@ -1,6 +1,7 @@
 Simple, automated, and unfinished single header that aims to read and write to memory addresses in a facile way.
 As of right now, it does not support layered addresses, like pointers. But it is in my to do list.
 It requires a txt file in the same folder as the exe. The txt file should contain, for example:
+```
 |NAME|ADDRESS
 Health 0x85BE94
 MaxHealth 0x85BE96
@@ -11,6 +12,7 @@ AmmoDecrease 0x3087C3
 ScreenWidth 0x8282CC
 ScreenHeight 0x8282D0
 |END|
+```
 The '|' is purely for commentary. Of course, these addresses are static.
 
 EXAMPLE:
