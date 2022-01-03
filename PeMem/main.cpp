@@ -1,9 +1,9 @@
 #include "PeMem.h"
 
-/*Simple, automated, and unfinished program that aims to read and write to addresses in a facile way.
-It contains the Process class, which will be constantly looking for the target process.
-It contains the Address class, which reads from a file that containes names, used as
-"keys", and addresses of interest. That file can and should be edited and updated with addresses.*/
+/*
+----->Please, read comments on PeMem.h<---------
+*/
+
 
 int main() {
 	/*Process. Float value is optional. By default, it is set to 0.100f (0.1 seconds)*/
@@ -19,9 +19,14 @@ int main() {
 	/*Time. It's a trivial class. Not recommended. Use SFML clock and time classes instead.*/
 	pemem::Time time;
 
+	/*Quick test, it will READ player's health*/
+	short health = address.ReadMemory<short>(address.GetAddress("Health"));
+	std::cout << "Player's health: " << health << "\n";
+
 	/*Quick test, it will write to the player's health*/
 	short maxHealth = 2400; //value we want to write to address
 	address.WriteMemory<short>(address.GetAddress("Health"), &maxHealth);//Writing to address
+
 
 	/*Main loop. Alive while we have target process open.*/
 	while (process.isOpen()) {
