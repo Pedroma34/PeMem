@@ -11,6 +11,11 @@
 #include <chrono>
 #include <Shlwapi.h> //must add shlwapi.lib to dependencies
 
+/*
+[Brasil and U.S.A] Created by Pedro Sérgio de Castro Sarmento Filho. Current located in the U.S, contact
+pedroma-guild@hotmail.com 
+*/
+
 /*Simple, automated, and unfinished set of classes that aims to read and write to addresses in a facile way.
 It contains the Process class, which will be constantly looking for the target process.
 It contains the Address class, which reads from a file that contains names, used as
