@@ -1,11 +1,15 @@
 ```
 (IMPORTANT) ADD shlwapi.lib TO YOUR DEPENDENCIES!
 ```
+# Descripition
+
 Simple, automated, and unfinished single header that aims to read and write to memory addresses in a facile way.
-It requires a txt file in the same folder as the exe. The txt file should contain, for example:
-```
+
+# Easy way to access addresses
+PeMem reads from a text file called addresses.txt, which is **MUST** be located at your program's exe folder. 
+The txt file should contain. 
+```Ruby
 |NAME|ADDRESS
-Health 0x85BE94
 MaxHealth 0x85BE96
 PosX 0x86CE6C
 PosY 0x86CE5C
@@ -15,13 +19,29 @@ ScreenWidth 0x8282CC
 ScreenHeight 0x8282D0
 |END|
 ```
-The '|' is purely for commentary. Of course, these addresses are static.
-As of right now, unfortunally, layered addresses (addresses with pointers,) is not supported. However, that is in my to do list.
 
-EXAMPLE:
-If you want to read the health of your player, first, you must know the type (float, int, short(2 byte), etc.)
-Next, call ReadMemory from the address class to get the VALUE pointed by that address.
+The '|' is purely for comments. All these addresses are static, of course. The module address will be added automatically. For example, if you find the your health address trough cheat engine, it will most likely be: "bio4.exe" + 0x85BE96. bio4.exe is the module. The way you tell PeMem the module is via the Process class constructor. As of right now, it only supports one module per process. However, it is in my to do list to change that.
+
+# How to add an address that has multiple offsets (pointers)?
+All the addresses above are solo, static addresses. Meaning that only adding the module to it will be enough (this is done in the background.)
+## Adding layred addresses
+First, you need to identify it by typing Pointer. Second, type how many offsets there are. Third, they name you want to give for this address. Fourth, the base address. Finally, you want to type all the offsets separated by spaces.
+For example:
+```Ruby
+|NAME|ADDRESS
+Pointer 1 Health 0x805F3C 0x4FB4
+Pointer 3 Ammo 0x806D8C 0xA 0x04 0xC 0x6
+Pointer 5 Stamina 0x807C8C 0x2 0x4 0x6 0x8 0xA
+Money 0x858CAC
+|END|
 ```
+Simple enough, guys. If your address is not a pointer, like "biot.exe" + 0x858CAC, just give it a name and paste the address.
+
+# Alright, how do I use it?
+
+# CODE
+
+```c++
 /*READING*/
 pemem::Process process("Resident Evil 4", L"bio4.exe", L"bio4.exe");
 pemem::Address address(&process);
@@ -37,8 +57,41 @@ float healthValue = address.ReadMemory<float>(healthAddress); //We are reading t
 ```
 
 Writing is the same idea. We need an address and a reference to a variable that holds the value we want to write to that address.
-```
+```c++
 /*WRITING*/
 float maxHealth = 2400; //value that we want to write
 address.WriteMemory<float>(healthAddress, &maxHealth); //Same as reading, we do care about the type. Easy enough.
 ```
+# Using In Main Loop
+What if you want to use it in your main loop?
+```c++
+pemem::Process process("Skyrim", "eo5.exe", "eo5.dll") // I made these names up lolz
+if(process.isOpen() == false)
+    return 0; //Game is not open. Let's abort.
+pemem::Address address(&process);
+pemem::Time time;
+
+float newHealth = 100;
+while(process.isOpen()){ //Loop will be alive as long as game is open
+  time.Update();//Updating time count
+  process.Update(); //It will keep track of your game.
+  if(Numb1 == Pressed){
+    address.WriteMemory<float>(address.GetAddress("Health"), &newHealth); //Regenerate player's health
+  }
+}
+return 0; //Game was closed, let's close the program
+```
+Note that Update() will be looking for your game every x seconds, so it doesn't consume all your cpu power. If you want to be crazy and just to update every tick:
+```c++
+pemem::Process process("Skyrim", "eo5.exe", "eo5.dll", 0)
+```
+The float 0 will be the cooldown, which in this case is none. So on the update meothod, it will update every tick.
+
+# How to know the name of the module of interest?
+In cheat engine, or whatever program you prefer, once you find an static address or pointer, it will display as such:
+```Ruby
+"modulename.dll" + "address"
+```
+That address, let's say, stores the player's health. All you need to do is to pass that module name to the constructor and add that address to your address.txt file with the name "Health" before it.
+#### The Current Problem
+Some games have more than one module. So different addresses are in different modules. As of right now, PeMem does not support more than one module.
