@@ -9,7 +9,7 @@ Simple, automated, and unfinished single header that aims to read and write to m
 
 # Easy way to access addresses
 PeMem reads from a text file called addresses.txt, which is **MUST** be located at your program's exe folder. 
-The txt file should contain. 
+The txt file should a name and an address. 
 ```Ruby
 |NAME|ADDRESS
 MaxHealth 0x85BE96
@@ -22,7 +22,7 @@ ScreenHeight 0x8282D0
 |END|
 ```
 
-The '|' is purely for comments. All these addresses are static, of course. The module address will be added automatically. For example, if you find the your health address trough cheat engine, it will most likely be: "bio4.exe" + 0x85BE96. bio4.exe is the module. The way you tell PeMem the module is via the Process class constructor. As of right now, it only supports one module per process. However, it is in my to do list to change that.
+The '|' is purely for comments. All these addresses are static, of course. The module address will be added automatically. For example, if you find the your health address through cheat engine, it will most likely be: "bio4.exe" + 0x85BE96. bio4.exe is the module. The way you tell PeMem the module is via the Process class constructor. As of right now, it only supports one module per process. However, it is in my to do list to change that.
 
 # How to add an address that has multiple offsets (pointers)?
 All the addresses above are solo, static addresses. Meaning that only adding the module to it will be enough (this is done in the background.)
