@@ -11,6 +11,31 @@
 #include <chrono>
 #include <Shlwapi.h> //must add shlwapi.lib to dependencies
 
+/*Simple, automated, and unfinished set of classes that aims to read and write to addresses in a facile way.
+It contains the Process class, which will be constantly looking for the target process.
+It contains the Address class, which reads from a file that contains names, used as
+"keys", and addresses of interest. That file can and should be edited and updated with addresses.
+It is possible to store addresses that contains multiple offsets (Pointers)*/
+
+/*Your addresses.txt should look something like: */
+/*
+|NAME| |ADDRESS|
+Health 0x00000
+Ammo 0x00000
+Stamina 0x00000
+*/ //Note that these addresses does not contains offsets(pointers)
+
+/*What if you want to store addresses that contain multiple offsets, like a pointer? Easy enough*/
+/*
+	Pointer 2 Health 0x0000 0x1 0x2
+	Pointer 1 Ammo 0x0000 0x1
+	Pointer 5 Stamina 0x0000 0x1 0x4 0x1 0x2 0x1
+*/
+/*The first indicator must ALWAYS be named "Pointer" (case sensitive.)
+Second indicator is how many offsets that address is pointing to.
+Third is the base address.
+Fourth and beyond are the offsets.*/
+
 namespace pemem {
 	inline std::string GetDirectory() {
 		HMODULE hModule = GetModuleHandle(nullptr); //get module for this .exe file
@@ -162,7 +187,7 @@ namespace pemem {
 		//Returns value pointed by the address
 		T ReadMemory(uintptr_t l_address) {
 			T tmpValue;
-			ReadProcesspemem(m_process->GetProcessHandle(), (BYTE*)l_address, &tmpValue, sizeof(tmpValue), 0);
+			ReadProcessMemory(m_process->GetProcessHandle(), (BYTE*)l_address, &tmpValue, sizeof(tmpValue), 0);
 
 			return tmpValue;
 		}
@@ -197,14 +222,53 @@ namespace pemem {
 				std::stringstream keystream(line);
 				std::string name;
 				keystream >> name;
+
+				/*If address has offsets*/
+				if (name == "Pointer") { 
+					unsigned int depth; //offset count
+					keystream >> depth;
+					std::string key; //name of our address, used as key in container
+					keystream >> key; 
+					std::string baseAddressString;
+					keystream >> baseAddressString; //Passing address as a string
+					uintptr_t baseAddress = ConvertStringToPtr(baseAddressString); //Our address in uinptr_t
+					baseAddress = m_process->GetModuleBase() + baseAddress; //Adding module
+					std::vector<unsigned int> offsets;
+					for (int i = 0; i < depth; i++) { //Looping through all the offsets
+						std::string offsetString;
+						keystream >> offsetString;
+						uintptr_t offset = ConvertStringToPtr(offsetString);
+						offsets.push_back(offset);
+					}
+					uintptr_t finalAddress = GetAddressPointer(baseAddress, offsets);
+					m_addresses.emplace(key, finalAddress); //No need to add module, since we already added before
+					continue; //Job done with this line, skipping this loop.
+				}
+
+				/*If address does not have offsets*/
 				std::string addressString;
 				keystream >> addressString;
-				uintptr_t address;
-				std::istringstream ss(&addressString[2]);
-				ss >> std::hex >> address;
-				m_addresses.emplace(name, m_process->GetModuleBase() + address);
+				uintptr_t address = ConvertStringToPtr(addressString);
+				m_addresses.emplace(name, m_process->GetModuleBase() + address); //Adding module to get static address
 			}
 			file.close();
+		}
+
+		/*Helper function to get address that has multiple offsets.*/
+		uintptr_t GetAddressPointer(uintptr_t l_baseAddress, const std::vector<unsigned int> &l_offsets) {
+			uintptr_t address = l_baseAddress;
+			for (int i = 0; i < l_offsets.size(); i++) {
+				ReadProcessMemory(m_process->GetProcessHandle(), (BYTE*)address, &address, sizeof(address), 0);
+				address += l_offsets[i];
+			}
+			return address;
+		}
+		/*Helper function that converts a string to uintptr_t*/
+		uintptr_t ConvertStringToPtr(std::string &l_addressString) {
+			uintptr_t address;
+			std::istringstream ss(&l_addressString[2]);
+			ss >> std::hex >> address;
+			return address;
 		}
 	};
 	class Time {
