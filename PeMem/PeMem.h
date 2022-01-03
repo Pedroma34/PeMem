@@ -37,6 +37,8 @@ Third is the base address.
 Fourth and beyond are the offsets.*/
 
 namespace pemem {
+
+	/*Returns the path to where the exe of your program is located.*/
 	inline std::string GetDirectory() {
 		HMODULE hModule = GetModuleHandle(nullptr); //get module for this .exe file
 		if (hModule) {
@@ -48,6 +50,8 @@ namespace pemem {
 		}
 		return "";
 	}
+
+	/*Class responsible to find or(and) keep track of a process.*/
 	class Process {
 		const wchar_t* m_processName;
 		const wchar_t* m_moduleName;
@@ -171,6 +175,8 @@ namespace pemem {
 				return true;
 		}
 	};
+
+	/*Class will keep track of all the addresses of our game, read as listed in addresses.txt file.*/
 	class Address {
 		/*Contains name(key) and addresses*/
 		std::map<std::string, uintptr_t> m_addresses;
@@ -271,6 +277,8 @@ namespace pemem {
 			return address;
 		}
 	};
+
+	/*Trivial class used to create a time that we can use as a timer. Must call update function in main loop to work.*/
 	class Time {
 		std::chrono::system_clock::time_point m_time1;
 		std::chrono::system_clock::time_point m_time2;
