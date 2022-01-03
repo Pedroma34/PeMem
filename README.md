@@ -9,7 +9,7 @@ Simple, automated, and unfinished single header that aims to read and write to m
 
 # Easy way to access addresses
 PeMem reads from a text file called addresses.txt, which is **MUST** be located at your program's exe folder. 
-The txt file should a name and an address. 
+The format should be NAME ADDRESS. 
 ```Ruby
 |NAME|ADDRESS
 MaxHealth 0x85BE96
