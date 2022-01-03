@@ -23,8 +23,8 @@ It is possible to store addresses that contains multiple offsets (Pointers)*/
 Health 0x00000
 Ammo 0x00000
 Stamina 0x00000
-*/ //Note that these addresses does not contains offsets(pointers)
-
+*/ //Note that these addresses do not contains offsets(pointers)
+   //Also, those are based on the module specified in the Process class constructor
 /*What if you want to store addresses that contain multiple offsets, like a pointer? Easy enough*/
 /*
 	Pointer 2 Health 0x0000 0x1 0x2
