@@ -1,6 +1,8 @@
 ```
 (IMPORTANT) ADD shlwapi.lib TO YOUR DEPENDENCIES!
 ```
+# GO TO main.cpp FOR A GOOD EXAMPLE
+
 # Descripition
 
 Simple, automated, and unfinished single header that aims to read and write to memory addresses in a facile way.
