@@ -251,7 +251,10 @@ namespace pemem {
 
 			WriteProcessMemory(m_process->GetProcessHandle(),
 				(LPVOID*)memoryData->address, (BYTE*)&memoryData->bytes.at(0), memoryData->size, NULL);
+
+			m_bytes.erase(itr); //removing it from container
 		}
+
 		//Getters
 		const uintptr_t& GetAddress(const std::string& l_name) {
 			auto itr = m_addresses.find(l_name);
