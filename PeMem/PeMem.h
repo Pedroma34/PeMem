@@ -185,8 +185,14 @@ namespace pemem {
 	class Address {
 		/*Contains name(key) and addresses*/
 		std::map<std::string, uintptr_t> m_addresses;
-		/*To be updated*/
-		std::map<std::string, std::vector<uintptr_t>> m_offsets;
+		/*Used to keep track of bytes written, like in a nop*/
+		struct MemoryData {
+			uintptr_t address;
+			unsigned int size;
+			std::vector<BYTE> bytes;
+		};
+		/*Key and byte data*/
+		std::map<std::string, MemoryData> m_bytes;
 		Process* m_process;
 	public:
 		Address(Process* l_process) : m_process(l_process) {
@@ -195,7 +201,7 @@ namespace pemem {
 		~Address() {}
 
 		template <typename T>
-		//Returns value pointed by the address
+		/*Returns the value pointed by that address*/
 		T ReadMemory(uintptr_t l_address) {
 			T tmpValue;
 			ReadProcessMemory(m_process->GetProcessHandle(), (BYTE*)l_address, &tmpValue, sizeof(tmpValue), 0);
@@ -204,11 +210,48 @@ namespace pemem {
 		}
 
 		template <typename T>
+		/*Writes to that address*/
 		void WriteMemory(uintptr_t l_where, T* l_value) {
 			WriteProcessMemory(m_process->GetProcessHandle(),
 				(LPVOID*)l_where, l_value, sizeof(*l_value), NULL);
 		}
 
+		/*Writes 0x90 an x amount of times to that address and stores the original bytes in m_bytes*/
+		void Nop(const std::string& l_key, uintptr_t l_where, const unsigned int& l_amountOfNops) {
+			auto itr = m_bytes.find(l_key);
+			if (itr != m_bytes.end())
+				return;//if it's already in container, cancel.
+
+			std::vector<BYTE> bytes;
+			std::vector<BYTE> oldBytes;
+			for (int i = 0; i < l_amountOfNops; i++) {
+				bytes.push_back(0x90);
+				oldBytes.push_back(0x0);
+			}
+
+			ReadProcessMemory(m_process->GetProcessHandle(),
+				(LPVOID*)l_where, (BYTE*)&oldBytes.at(0), l_amountOfNops, NULL); //storing original bytes 
+			WriteProcessMemory(m_process->GetProcessHandle(),
+				(LPVOID*)l_where, (BYTE*)&bytes.at(0), l_amountOfNops, NULL);
+
+			MemoryData memoryData;
+			memoryData.address = l_where;
+			memoryData.bytes = oldBytes;
+			memoryData.size = l_amountOfNops;
+			m_bytes.emplace(l_key, memoryData);
+		}
+
+		/*Writes the original bytes to where it was nopped before*/
+		void Unop(const std::string& l_key) {
+			auto itr = m_bytes.find(l_key);
+			if (itr == m_bytes.end())
+				return;// not in memory or wrong key, cancel.
+
+			MemoryData* memoryData = &itr->second;
+
+			WriteProcessMemory(m_process->GetProcessHandle(),
+				(LPVOID*)memoryData->address, (BYTE*)&memoryData->bytes.at(0), memoryData->size, NULL);
+		}
 		//Getters
 		const uintptr_t& GetAddress(const std::string& l_name) {
 			auto itr = m_addresses.find(l_name);
