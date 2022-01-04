@@ -30,6 +30,11 @@ int main() {
 	short maxHealth = 2400; //value we want to write to address
 	address.WriteMemory<short>(address.GetAddress("Health"), &maxHealth);//Writing to address
 
+	/*Quick test, it will nop (write 0x90) to an instruction*/
+	address.Nop("InfiniteAmmo", address.GetAddress("AmmoDecrease"), 4); //now we have infinite ammo
+	//The first string serves as a key
+	/*Unoping (writing original bytes to where it was nopped*/
+	address.Unop("InfiniteAmo"); //disables infinite ammo by writing original bytes to instruction
 
 	/*Main loop. Alive while we have target process open.*/
 	while (process.isOpen()) {
