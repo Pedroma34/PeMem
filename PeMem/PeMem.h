@@ -9,6 +9,7 @@
 #include <iostream>
 #include <TlHelp32.h>
 #include <chrono>
+#include <array>
 #include <Shlwapi.h> //must add shlwapi.lib to dependencies
 
 /*
@@ -216,6 +217,45 @@ namespace pemem {
 				(LPVOID*)l_where, l_value, sizeof(*l_value), NULL);
 		}
 
+		/*Editing bytes in a specific way.*/
+		void EditBytes(const std::string& l_key, uintptr_t l_where, const std::vector<BYTE> &l_bytesToWrite,
+			const unsigned int &l_sizeOfOriginalBytes) {
+
+			auto itr = m_bytes.find(l_key);
+			if (itr != m_bytes.end())
+				return;//if it's already in container, cancel.
+
+			std::vector<BYTE> originalBytes;
+			for (int i = 0; i < l_sizeOfOriginalBytes; i++) 
+				originalBytes.push_back(0x0); //allocating space of the original bytes
+			
+
+			ReadProcessMemory(m_process->GetProcessHandle(),
+					(LPVOID*)l_where, (BYTE*)&originalBytes.at(0), originalBytes.size(), NULL); //storing original bytes
+			WriteProcessMemory(m_process->GetProcessHandle(),
+				(LPVOID*)l_where, (BYTE*)&l_bytesToWrite.at(0), l_bytesToWrite.size(), NULL);
+
+			MemoryData memory;
+			memory.address = l_where;
+			memory.bytes = originalBytes;
+			memory.size = originalBytes.size();
+			m_bytes.emplace(l_key, memory);
+		}
+
+		/*Restoring original bytes*/
+		void UneditBytes(const std::string& l_key) {
+			auto itr = m_bytes.find(l_key);
+			if (itr == m_bytes.end())
+				return;// not in memory or wrong key, cancel.
+
+			MemoryData* memoryData = &itr->second;
+
+			WriteProcessMemory(m_process->GetProcessHandle(),
+				(LPVOID*)memoryData->address, (BYTE*)&memoryData->bytes.at(0), memoryData->size, NULL);
+
+			m_bytes.erase(itr); //removing it from container
+		}
+
 		/*Writes 0x90 an x amount of times to that address and stores the original bytes in m_bytes*/
 		void Nop(const std::string& l_key, uintptr_t l_where, const unsigned int& l_amountOfNops) {
 			auto itr = m_bytes.find(l_key);
@@ -228,7 +268,7 @@ namespace pemem {
 				bytes.push_back(0x90);
 				oldBytes.push_back(0x0);
 			}
-
+		
 			ReadProcessMemory(m_process->GetProcessHandle(),
 				(LPVOID*)l_where, (BYTE*)&oldBytes.at(0), l_amountOfNops, NULL); //storing original bytes 
 			WriteProcessMemory(m_process->GetProcessHandle(),
