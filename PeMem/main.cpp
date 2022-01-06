@@ -36,6 +36,10 @@ int main() {
 	/*Unoping (writing original bytes to where it was nopped*/
 	address.Unop("InfiniteAmo"); //disables infinite ammo by writing original bytes to instruction
 
+	//Editing memory(bytes) in a specific way
+	address.EditBytes("EnemyHealthDecrease", address.GetAddress("EnemyHealthDecrease"), {0x83, 0xAE, 0x24, 0x03, 0x00, 0x00, 0x00 }, 7);
+	address.UneditBytes("EnemyHealthDecrease");
+
 	/*Main loop. Alive while we have target process open.*/
 	while (process.isOpen()) {
 		time.Update();//Reseting our elapsed time every tick.
