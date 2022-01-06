@@ -8,7 +8,7 @@
 Simple, automated, and unfinished single header that aims to read and write to memory addresses in a facile way.
 
 # Easy way to access addresses
-PeMem reads from a text file called addresses.txt, which is **MUST** be located at your program's exe folder. 
+PeMem reads from a text file called addresses.txt, which is **MUST** be located at your program's exe folder. However, this is a way to facilitate access to addresses, substituting them for strings. This is not required, as you can just call process.GetModuleBase + 0x0000 in your code. If you want to skip that step, you can save the address in a text file, giving it a name that will act as a key. So in your code, you can type something like address.GetAddress("NameOfYourAddress) and it will return a uintptr_t containing the address as stated in the txt file.
 The format should be NAME ADDRESS. 
 ```Ruby
 |NAME|ADDRESS
