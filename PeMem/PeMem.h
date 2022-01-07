@@ -9,12 +9,12 @@
 #include <iostream>
 #include <TlHelp32.h>
 #include <chrono>
-#include <array>
+#include <vector>
 #include <Shlwapi.h> //must add shlwapi.lib to dependencies
 
 /*
-[Brasil and U.S.A] Created by Pedro Sérgio de Castro Sarmento Filho. Current located in the U.S, contact
-pedroma-guild@hotmail.com 
+[Brasil and U.S.A] Created by Pedro SÃ©rgio de Castro Sarmento Filho. Current located in the U.S, contact
+pedroma-guild@hotmail.com
 */
 
 /*Simple, automated, and unfinished set of classes that aims to read and write to addresses in a facile way.
@@ -30,7 +30,7 @@ Health 0x00000
 Ammo 0x00000
 Stamina 0x00000
 */ //Note that these addresses do not contains offsets(pointers)
-   //Also, those are based on the module specified in the Process class constructor
+//Also, those are based on the module specified in the Process class constructor
 /*What if you want to store addresses that contain multiple offsets, like a pointer? Easy enough*/
 /*
 	Pointer 2 Health 0x0000 0x1 0x2
@@ -70,7 +70,7 @@ namespace pemem {
 		float m_maxCoolDown;//In seconds, how ofter we will look for target process in our main loop
 		float m_coolDown;
 	public:
-		Process(const char * l_windowName, const wchar_t* l_process, 
+		Process(const char* l_windowName, const wchar_t* l_process,
 			const wchar_t* l_module, float l_coolDown = 0.100f)
 			: m_processName(l_process), m_moduleName(l_module), m_windowName(l_windowName), m_processHandle(0), m_processId(0),
 			m_windowHandle(0), m_moduleBase(0), m_maxCoolDown(l_coolDown), m_coolDown(m_maxCoolDown) {
@@ -182,18 +182,182 @@ namespace pemem {
 		}
 	};
 
+	/*External Hook class that will be used in the Address class. It is counseled not to use this class by itself.*/
+	class ExternalHook {
+		std::vector<BYTE> m_ourFunctBytes; //Holds the bytes of our function, acquired trough GrabBytes()
+		uintptr_t m_toHook; //address of target's instrunction
+		uintptr_t m_ourFunct; //hook function
+		uintptr_t m_ourCave; //Where our function is located inside targets memory
+		std::vector<BYTE> m_originalBytes; //Holds the original bytes of the target's address
+		uintptr_t m_size; //length of original bytes
+		HANDLE m_handle; //process handle
+		bool m_isHooked;
+	public:
+		ExternalHook(HANDLE l_handle, uintptr_t l_ourFunction, uintptr_t l_where, const int& l_size) :
+			m_handle(l_handle),
+			m_ourFunct(l_ourFunction),
+			m_toHook(l_where),
+			m_size(l_size),
+			m_isHooked(false) {
+
+			GrabBytes(); //Saving our function in bytes
+
+		}
+		~ExternalHook() {}
+
+		void HookOn() {
+			if (m_isHooked == true)
+				return;
+			InsertFunction();
+			m_isHooked = CreateDetour();
+		}
+		void HookOff() {
+			if (m_isHooked == false)
+				return;
+			m_isHooked = Restore();
+		}
+
+		const bool& isHooked() { return m_isHooked; }
+	private:
+		/*Saves our function's bytes to container and returns the size of our function */
+		int GrabBytes() {
+			for (int i = 0;; i++) {
+				if (*(BYTE*)(m_ourFunct + i) == 0xCC &&
+					(*(BYTE*)(m_ourFunct + i - 1)) == 0xC3 ||
+					(*(BYTE*)(m_ourFunct + i + 1)) == 0xCC &&
+					(*(BYTE*)(m_ourFunct + i)) == 0xCC) {
+					return i; // Returns the number of bytes found
+				}
+
+				//Add the byte to the vector
+				m_ourFunctBytes.push_back(*(BYTE*)(m_ourFunct + i));
+			}
+		}
+
+		/*Allocates a new space in memory for our function*/
+		void InsertFunction() {
+			uintptr_t oldProtect, Bkup;
+
+
+			int sizeOfFunction = m_ourFunctBytes.size();
+
+			//Allocate memory in the other process to place our hook function in
+			LPVOID arg = VirtualAllocEx( /*It will return the address of the allocated region*/
+				m_handle, /*Target process handle*/
+				NULL/*the function determines where to allocate the region*/,
+				sizeOfFunction + 0x5/*Size of our function plus jump instruction*/,
+				MEM_RESERVE | MEM_COMMIT, /*Allocates memory*/
+				PAGE_READWRITE);
+
+
+			//Change protections of the newly allocated region, so we can write our function later
+			VirtualProtectEx(m_handle, arg, sizeOfFunction + 0x5, PAGE_EXECUTE_READWRITE, (PDWORD)&oldProtect);
+
+
+			//Calculate the jump to the original function (a.k.a relative address)
+			uintptr_t relativeAddress = (m_toHook - (uintptr_t)arg) - 5;
+
+
+			//Writing our function into the newly allocated memory
+			WriteProcessMemory(m_handle, arg, &m_ourFunctBytes.at(0), sizeOfFunction, NULL);
+
+
+			//At the end of it, add a jump
+			BYTE jump = 0xE9;
+			WriteProcessMemory(m_handle, (LPVOID)((uintptr_t)arg + sizeOfFunction), &jump, sizeof(jump), NULL);
+			WriteProcessMemory(m_handle, (LPVOID)((uintptr_t)arg + sizeOfFunction + 0x1), &relativeAddress, sizeof(relativeAddress), NULL);
+
+			//Used in the CreateDetour function
+			m_ourCave = (uintptr_t)arg;
+		}
+
+		/*Writes jump in the target's address to our cave*/
+		bool CreateDetour() {
+			uintptr_t oldProtect, Bkup, relativeAddy;
+
+			//The hook jmp takes 5 bytes
+			if (m_size < 5)
+				return false;
+
+
+			//Make sure we can even write to the section of memory
+			if (!VirtualProtectEx(m_handle, (LPVOID)m_toHook, m_size, PAGE_EXECUTE_READWRITE, (PDWORD)&oldProtect))
+				return false;
+
+
+			//Just some variables needed to apply the hook
+			BYTE jump = 0xE9;
+			BYTE NOP = 0x90;
+			BYTE NOPS[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+
+			//Put the original function bytes into m_restoreBytes for when we want to undo the hook
+			for (int i = 0; i < m_size; i++)
+				m_originalBytes.push_back(0x0);
+
+			ReadProcessMemory(m_handle, (LPVOID)m_toHook, &m_originalBytes.front(), m_size, NULL);
+
+			//Calculate the jump to the hook function
+			relativeAddy = (m_ourCave - m_toHook) - 5;
+			//Write the jump
+			WriteProcessMemory(m_handle, (LPVOID)m_toHook, &jump, sizeof(jump), NULL);
+			WriteProcessMemory(m_handle, (LPVOID)(m_toHook + 0x1), &relativeAddy, sizeof(relativeAddy), NULL);
+
+			//Write all of the nops at once, instead of making multiple calls
+			int new_len = m_size - 5;
+			if (new_len > 0)
+				WriteProcessMemory(m_handle, (LPVOID)(m_toHook + 0x5), NOPS, new_len, NULL);
+
+
+			//Restore the previous protection
+			if (!VirtualProtectEx(m_handle, (LPVOID)m_toHook, m_size, oldProtect, (PDWORD)&Bkup))
+				return false;
+
+
+			return true;
+		}
+
+		/*Get original bytes to be written back*/
+		bool Restore() {
+			uintptr_t oldProtect, Bkup;
+
+			//So we can restore the bytes
+			if (!VirtualProtectEx(m_handle, (LPVOID)m_toHook, m_size, PAGE_EXECUTE_READWRITE, (PDWORD)&oldProtect))
+				return false;
+
+
+			//Write the original bytes back into the function
+			WriteProcessMemory(m_handle, (LPVOID)m_toHook, &m_originalBytes.front(), m_size, NULL);
+
+			if (!VirtualProtectEx(m_handle, (LPVOID)m_toHook, m_size, oldProtect, (PDWORD)&Bkup))
+				return false;
+
+
+			//Free the memory we allocated for our hook
+			VirtualFreeEx(m_handle, (LPVOID)m_ourCave, 0, MEM_RELEASE);
+
+			return true;
+		}
+	};
+
 	/*Class will keep track of all the addresses of our game, read as listed in addresses.txt file.*/
 	class Address {
+
 		/*Contains name(key) and addresses*/
 		std::map<std::string, uintptr_t> m_addresses;
+
 		/*Used to keep track of bytes written, like in a nop*/
 		struct MemoryData {
 			uintptr_t address;
 			unsigned int size;
 			std::vector<BYTE> bytes;
 		};
+
 		/*Key and byte data*/
 		std::map<std::string, MemoryData> m_bytes;
+
+		/*Contains name(key) and hook data*/
+		std::map<std::string, std::unique_ptr<ExternalHook>> m_hooks;
+
 		Process* m_process;
 	public:
 		Address(Process* l_process) : m_process(l_process) {
@@ -218,20 +382,20 @@ namespace pemem {
 		}
 
 		/*Editing bytes in a specific way.*/
-		void EditBytes(const std::string& l_key, uintptr_t l_where, const std::vector<BYTE> &l_bytesToWrite,
-			const unsigned int &l_sizeOfOriginalBytes) {
+		void EditBytes(const std::string& l_key, uintptr_t l_where, const std::vector<BYTE>& l_bytesToWrite,
+			const unsigned int& l_sizeOfOriginalBytes) {
 
 			auto itr = m_bytes.find(l_key);
 			if (itr != m_bytes.end())
 				return;//if it's already in container, cancel.
 
 			std::vector<BYTE> originalBytes;
-			for (int i = 0; i < l_sizeOfOriginalBytes; i++) 
+			for (int i = 0; i < l_sizeOfOriginalBytes; i++)
 				originalBytes.push_back(0x0); //allocating space of the original bytes
-			
+
 
 			ReadProcessMemory(m_process->GetProcessHandle(),
-					(LPVOID*)l_where, (BYTE*)&originalBytes.at(0), originalBytes.size(), NULL); //storing original bytes
+				(LPVOID*)l_where, (BYTE*)&originalBytes.at(0), originalBytes.size(), NULL); //storing original bytes
 			WriteProcessMemory(m_process->GetProcessHandle(),
 				(LPVOID*)l_where, (BYTE*)&l_bytesToWrite.at(0), l_bytesToWrite.size(), NULL);
 
@@ -268,7 +432,7 @@ namespace pemem {
 				bytes.push_back(0x90);
 				oldBytes.push_back(0x0);
 			}
-		
+
 			ReadProcessMemory(m_process->GetProcessHandle(),
 				(LPVOID*)l_where, (BYTE*)&oldBytes.at(0), l_amountOfNops, NULL); //storing original bytes 
 			WriteProcessMemory(m_process->GetProcessHandle(),
@@ -293,6 +457,30 @@ namespace pemem {
 				(LPVOID*)memoryData->address, (BYTE*)&memoryData->bytes.at(0), memoryData->size, NULL);
 
 			m_bytes.erase(itr); //removing it from container
+		}
+
+		/*Creates an external hook. Our hook functions must end with int 3 int 3. See example int github.*/
+		void Hook(const std::string& l_key, uintptr_t l_ourFunction, uintptr_t l_where, const unsigned int& l_size) {
+			auto itr = m_hooks.find(l_key);
+			if (itr != m_hooks.end())
+				return; //Already in memory, doesn't need to be hooked again. Call UnHook function to disabel hook.
+
+			auto newHook = std::make_unique<ExternalHook>(m_process->GetProcessHandle(), l_ourFunction,
+				l_where, l_size);
+			newHook->HookOn();
+			if (!newHook->isHooked())
+				return;//something went wrong
+			m_hooks.emplace(l_key, std::move(newHook));
+		}
+
+		/*Restores original bytes to wherever it was written*/
+		void UnHook(const std::string& l_key) {
+			auto itr = m_hooks.find(l_key);
+			if (itr == m_hooks.end())
+				return; //Not in memory
+			if (!itr->second->isHooked())
+				return;
+			itr->second->HookOff();
 		}
 
 		//Getters
@@ -321,11 +509,11 @@ namespace pemem {
 				keystream >> name;
 
 				/*If address has offsets*/
-				if (name == "Pointer") { 
+				if (name == "Pointer") {
 					unsigned int depth; //offset count
 					keystream >> depth;
 					std::string key; //name of our address, used as key in container
-					keystream >> key; 
+					keystream >> key;
 					std::string baseAddressString;
 					keystream >> baseAddressString; //Passing address as a string
 					uintptr_t baseAddress = ConvertStringToPtr(baseAddressString); //Our address in uinptr_t
@@ -352,7 +540,7 @@ namespace pemem {
 		}
 
 		/*Helper function to get address that has multiple offsets.*/
-		uintptr_t GetAddressPointer(uintptr_t l_baseAddress, const std::vector<unsigned int> &l_offsets) {
+		uintptr_t GetAddressPointer(uintptr_t l_baseAddress, const std::vector<unsigned int>& l_offsets) {
 			uintptr_t address = l_baseAddress;
 			for (int i = 0; i < l_offsets.size(); i++) {
 				ReadProcessMemory(m_process->GetProcessHandle(), (BYTE*)address, &address, sizeof(address), 0);
@@ -361,7 +549,7 @@ namespace pemem {
 			return address;
 		}
 		/*Helper function that converts a string to uintptr_t*/
-		uintptr_t ConvertStringToPtr(std::string &l_addressString) {
+		uintptr_t ConvertStringToPtr(std::string& l_addressString) {
 			uintptr_t address;
 			std::istringstream ss(&l_addressString[2]);
 			ss >> std::hex >> address;
